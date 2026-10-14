@@ -21,7 +21,7 @@ struct MacView: View {
     let session: MacSession
     @State private var mode = Mode.sword
     enum Mode: String, CaseIterable, Identifiable {
-        case studio = "Motion Studio", sword = "Sword Demo"
+        case studio = "Motion Studio", sword = "Sword Demo", wok = "Wok Demo"
         var id: Self { self }
     }
     var body: some View {
@@ -31,7 +31,7 @@ struct MacView: View {
                 Text("MotionLink").font(.title2.bold())
                 Picker("View", selection: $mode) {
                     ForEach(Mode.allCases) { Text($0.rawValue).tag($0) }
-                }.pickerStyle(.segmented).frame(width: 300).padding(.leading, 16)
+                }.pickerStyle(.segmented).frame(width: 430).padding(.leading, 16)
                 Spacer()
                 StatusPill(text: session.isDemo ? "Demo motion" : session.status,
                            active: session.deviceName != nil && !session.isPaused && !session.isStale)
@@ -39,10 +39,11 @@ struct MacView: View {
             .padding(.horizontal, 28).padding(.top, 32).padding(.bottom, 22)
             Divider().overlay(.white.opacity(0.04))
             if mode == .studio { studio }
-            else { SwordDemoView(session: session) }
+            else if mode == .sword { SwordDemoView(session: session) }
+            else { WokDemoView(session: session) }
         }.background(MotionTheme.background)
             .onChange(of: mode) { _, mode in
-                if mode == .sword && session.isDemo { session.toggleDemo() }
+                if mode != .studio && session.isDemo { session.toggleDemo() }
             }
     }
 
@@ -104,11 +105,12 @@ struct MacView: View {
 
 struct MacPairingCard: View {
     let session: MacSession
+    var neutralInstruction = "Hold your iPhone still and upright, then set its neutral pose to align the model."
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if let name = session.deviceName {
                 Label(name, systemImage: "iphone").font(.headline)
-                Text("Hold your iPhone still and upright, then set its neutral pose to align the model.")
+                Text(neutralInstruction)
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Button("Disconnect phone", role: .destructive) { session.disconnect() }
             } else {

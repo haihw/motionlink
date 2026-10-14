@@ -131,17 +131,19 @@ struct SwordGameEngine: Sendable {
 }
 
 /// Integrates short-gesture velocity on the sensor clock, never the render clock.
-/// Position holds when velocity reaches zero. Bounds limit accumulated inertial drift.
+/// A steady handle recenters translation only; its attitude reference is untouched.
 struct SwordTranslationTracker: Sendable {
     static let gain: Float = 3
     static let limits = SIMD3<Float>(1.35, 0.8, 1.1)
     private(set) var displacement = SIMD3<Float>.zero
     private var lastTimestamp: Double?
     private var previousVelocity = SIMD3<Float>.zero
+    private var steadyDuration = 0.0
+    private(set) var isRecentering = false
 
     mutating func reset() { self = Self() }
 
-    mutating func update(_ movement: MotionEstimate, timestamp: Double) -> SIMD3<Float> {
+    mutating func update(_ movement: MotionEstimate, timestamp: Double, isSteady: Bool = false) -> SIMD3<Float> {
         guard timestamp.isFinite, movement.isAvailable, movement.velocity.isValid else {
             reset(); return displacement
         }
@@ -156,6 +158,14 @@ struct SwordTranslationTracker: Sendable {
             return displacement
         }
         self.lastTimestamp = timestamp
+        steadyDuration = isSteady ? steadyDuration + dt : 0
+        isRecentering = steadyDuration >= 0.8
+        if isRecentering {
+            displacement *= Float(exp(-dt / 0.25))
+            if simd_length(displacement) < 0.002 { displacement = .zero }
+            previousVelocity = .zero
+            return displacement
+        }
         displacement += (previousVelocity + velocity) * Float(dt * 0.5) * Self.gain
         for axis in 0..<3 {
             displacement[axis] = min(Self.limits[axis], max(-Self.limits[axis], displacement[axis]))

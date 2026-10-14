@@ -48,7 +48,7 @@ struct SwordArenaView: NSViewRepresentable {
         func build(in view: ARView) {
             let camera = PerspectiveCamera()
             camera.camera.fieldOfViewInDegrees = 43
-            camera.position = [1.7, 1.2, 5.2]
+            camera.position = [0, 0.65, 5.6]
             camera.look(at: [0, 0.20, -0.20], from: camera.position, relativeTo: nil)
             root.addChild(camera)
             let key = DirectionalLight()
@@ -116,7 +116,7 @@ struct SwordArenaView: NSViewRepresentable {
             }
 
             let live = session.deviceName != nil && !session.isPaused && !session.isStale
-                && session.movement.isAvailable && session.isNeutralConfirmed && !session.isDemo
+                && session.movement.isAvailable && session.isNeutralConfirmed && !session.isDemo && !session.isSwordRecentering
             let pose: SwordPose
             let energy: Bool
             if autoplay {

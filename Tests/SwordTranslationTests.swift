@@ -56,3 +56,44 @@ func translationLimitsAndReset() {
     #expect(tracker.displacement == .zero)
     #expect(tracker.update(.unavailable, timestamp: 5.2) == .zero)
 }
+
+@Test("A sustained steady handle smoothly recenters position while preserving its angle")
+func steadyHandleRecenters() {
+    var tracker = SwordTranslationTracker()
+    for tick in 0...30 { _ = tracker.update(travel([0.3, 0.1, -0.2]), timestamp: Double(tick) / 60) }
+    let angle = MotionQuaternion(simd_quatf(angle: -1.1, axis: simd_normalize(SIMD3<Float>(1, 0.5, -0.3))))
+    for tick in 31...60 { _ = tracker.update(travel(.zero), timestamp: Double(tick) / 60, isSteady: true) }
+    #expect(!tracker.isRecentering)
+    var lastDistance = simd_length(tracker.displacement)
+    for tick in 61...240 {
+        _ = tracker.update(travel(.zero), timestamp: Double(tick) / 60, isSteady: true)
+        let distance = simd_length(tracker.displacement)
+        #expect(distance <= lastDistance + 0.00001)
+        #expect(lastDistance - distance < 0.05)
+        lastDistance = distance
+        let pose = SwordPose.phone(orientation: angle, displacement: tracker.displacement)
+        #expect(pose.rotation == angle)
+        #expect(simd_distance(pose.tip - pose.grip, angle.rotation.act([0, 1.5, 0])) < 0.00001)
+    }
+    #expect(tracker.isRecentering)
+    #expect(tracker.displacement == .zero)
+}
+
+@Test("A swing interrupts recentering and brief pauses never start it")
+func recenterInterrupted() {
+    var tracker = SwordTranslationTracker()
+    for tick in 0...30 { _ = tracker.update(travel([0.4, 0, 0]), timestamp: Double(tick) / 60) }
+    for tick in 31...60 { _ = tracker.update(travel(.zero), timestamp: Double(tick) / 60, isSteady: true) }
+    #expect(!tracker.isRecentering)
+    _ = tracker.update(travel(.zero), timestamp: 61.0 / 60, isSteady: false)
+    for tick in 62...92 { _ = tracker.update(travel(.zero), timestamp: Double(tick) / 60, isSteady: true) }
+    #expect(!tracker.isRecentering)
+    for tick in 93...122 { _ = tracker.update(travel(.zero), timestamp: Double(tick) / 60, isSteady: true) }
+    #expect(tracker.isRecentering)
+    let position = tracker.displacement
+    _ = tracker.update(travel([0.4, 0, 0]), timestamp: 123.0 / 60, isSteady: false)
+    #expect(!tracker.isRecentering)
+    #expect(tracker.displacement.x > position.x)
+    tracker.reset()
+    #expect(!tracker.isRecentering)
+}

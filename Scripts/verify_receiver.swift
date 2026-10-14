@@ -98,7 +98,28 @@ struct ReceiverVerification {
         receiver.confirmNeutralPosition()
         try require(receiver.isNeutralConfirmed, "User confirmation did not activate sword control")
         try require(abs(receiver.orientation.rotation.real - 1) < 0.0001, "Confirmation did not center the sword")
+        sample.acceleration = MotionVector(x: 0.3, y: 0, z: 0)
+        for sequence in 46...75 {
+            sample.sequence = UInt64(sequence); sample.timestamp += 1.0 / 60
+            sender.send(LinkMessage(kind: .motion, sample: sample))
+            try await waitUntil("hand translation received") { receiver.sample?.sequence == UInt64(sequence) }
+        }
+        try require(receiver.swordDisplacement.x > 0.3, "Phone movement did not translate the sword grip")
+        sample.acceleration = .zero
+        sample.attitude = MotionQuaternion(simd_quatf(angle: 0.4, axis: [1, 0, 0]))
+        let revisionBeforeCenter = receiver.poseRevision
+        for sequence in 76...255 {
+            sample.sequence = UInt64(sequence); sample.timestamp += 1.0 / 60
+            sender.send(LinkMessage(kind: .motion, sample: sample))
+            try await waitUntil("steady handle received") { receiver.sample?.sequence == UInt64(sequence) }
+        }
+        try require(receiver.isSwordRecentering && receiver.swordDisplacement == .zero, "Steady hold did not recenter the grip")
+        let preserved = MotionQuaternion(simd_quatf(angle: -0.8, axis: [1, 0, 0]))
+        try require(abs(simd_dot(receiver.orientation.rotation.vector, preserved.rotation.vector)) > 0.9999, "Auto recenter changed the blade angle")
+        try require(receiver.isNeutralConfirmed, "Auto recenter unnecessarily reset neutral confirmation")
+        try require(receiver.poseRevision > revisionBeforeCenter, "Auto recenter did not clear the collision sweep")
         receiver.resetNeutralPosition()
+        try require(receiver.swordDisplacement == .zero, "Neutral reset did not recenter the grip")
         try require(!receiver.isNeutralConfirmed && !receiver.neutralCheck.isReady, "Neutral reset retained readiness")
         receiver.confirmNeutralPosition()
         try require(!receiver.isNeutralConfirmed, "Confirmation bypassed a fresh steady hold")
@@ -106,15 +127,15 @@ struct ReceiverVerification {
         sender.send(LinkMessage(kind: .motion, sample: sample))
         sender.send(LinkMessage(kind: .paused)) // Ordered barrier on the TCP stream.
         try await waitUntil("ordered barrier received") { receiver.isPaused }
-        try require(receiver.sample?.sequence == 45, "An old sequence overwrote current motion")
-        sample.sequence = 46; sample.attitude = MotionQuaternion(x: 0, y: 0, z: 0, w: 0)
+        try require(receiver.sample?.sequence == 255, "An old sequence overwrote current motion")
+        sample.sequence = 256; sample.attitude = MotionQuaternion(x: 0, y: 0, z: 0, w: 0)
         sender.send(LinkMessage(kind: .motion, sample: sample))
         try await waitUntil("invalid sample disconnect") { log.closed && receiver.deviceName == nil }
         try require(!receiver.isNeutralConfirmed, "Disconnection retained neutral confirmation")
         try require(receiver.sample == nil, "Disconnected readings were not cleared")
         try require(!receiver.movement.isAvailable && receiver.movement.speed == 0, "Disconnected speed was not cleared")
         try require(receiver.pairingCode != pairedCode, "Pairing code did not rotate")
-        print("PASS: incorrect code, pairing, one-phone limit, motion vectors, speed reset, calibration, pause/resume, explicit neutral confirmation/reset, sequence ordering, invalid-sample disconnect.")
+        print("PASS: incorrect code, pairing, one-phone limit, motion vectors, speed reset, calibration, pause/resume, explicit neutral confirmation/reset, 3D grip translation, steady recenter with angle preserved, sequence ordering, invalid-sample disconnect.")
     }
 }
 

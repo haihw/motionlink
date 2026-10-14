@@ -16,6 +16,7 @@ final class MacSession {
     var neutralCheck = NeutralPoseCheck()
     var movement = MotionEstimate.unavailable
     var swordDisplacement = SIMD3<Float>.zero
+    var isSwordRecentering = false
     var receivedFPS = 0
     var isListening = false
     var isPaused = false
@@ -142,7 +143,13 @@ final class MacSession {
                 self.orientation = sample.attitude.relative(to: self.reference ?? .identity)
                 self.movement = self.motionTracker.update(sample, orientation: self.orientation)
                 if self.isNeutralConfirmed {
-                    self.swordDisplacement = self.swordTranslation.update(self.movement, timestamp: sample.timestamp)
+                    let steady = sample.rotationRate.magnitude < 0.16
+                        && sample.acceleration.magnitude * Double(LinearMotionTracker.standardGravity) < 0.22
+                    self.swordDisplacement = self.swordTranslation.update(self.movement, timestamp: sample.timestamp, isSteady: steady)
+                    if self.isSwordRecentering != self.swordTranslation.isRecentering {
+                        self.isSwordRecentering = self.swordTranslation.isRecentering
+                        self.poseRevision += 1 // Neither entering nor leaving recentering can sweep a hit.
+                    }
                 }
             case .paused:
                 self.isPaused = true; self.status = "Phone paused"
@@ -194,6 +201,7 @@ final class MacSession {
 
     private func resetSwordTranslation() {
         swordTranslation.reset()
+        isSwordRecentering = false
         swordDisplacement = .zero
         poseRevision += 1
     }

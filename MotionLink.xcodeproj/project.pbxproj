@@ -5,6 +5,14 @@
 	};
 	objectVersion = 56;
 	objects = {
+		DFD0269BF13C27A59FAE5AFC = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/WokGameplay.swift"; sourceTree = SOURCE_ROOT; };
+		1A4436D6ADEE9E0005F43174 = { isa = PBXBuildFile; fileRef = DFD0269BF13C27A59FAE5AFC; };
+		52988277A823F7A8E8E4AA2C = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "macOS/WokArenaView.swift"; sourceTree = SOURCE_ROOT; };
+		3007AEEE8458D5FF49FC5251 = { isa = PBXBuildFile; fileRef = 52988277A823F7A8E8E4AA2C; };
+		2091485D0CC08A826B8D0354 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "macOS/WokDemoView.swift"; sourceTree = SOURCE_ROOT; };
+		7A08D02EB0D19E5B44C1CC27 = { isa = PBXBuildFile; fileRef = 2091485D0CC08A826B8D0354; };
+		E67C431BB6E0C0DFE98535DD = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/WokGameplay.swift"; sourceTree = SOURCE_ROOT; };
+		DF1C21F20D2D712A002D2C67 = { isa = PBXBuildFile; fileRef = E67C431BB6E0C0DFE98535DD; };
 		8DA554B3DB00F7AD511CB330 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/NeutralPose.swift"; sourceTree = SOURCE_ROOT; };
 		02BB573173A852D3D4B72434 = { isa = PBXBuildFile; fileRef = 8DA554B3DB00F7AD511CB330; };
 		2A350613FD535BE2F10061A1 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/NeutralPose.swift"; sourceTree = SOURCE_ROOT; };
@@ -70,6 +78,9 @@
 		B9DA35DEA3131434A251F3E5 /* MotionLinkMac */ = {
 			isa = PBXGroup;
 			children = (
+				52988277A823F7A8E8E4AA2C,
+				2091485D0CC08A826B8D0354,
+				E67C431BB6E0C0DFE98535DD,
 				2A350613FD535BE2F10061A1,
 				DD0AC0302545855878B96197,
 				26503C3CEDA8DD7CCEF18807,
@@ -88,6 +99,7 @@
 		BB02390386B343889E68B813 /* MotionLinkPhone */ = {
 			isa = PBXGroup;
 			children = (
+				DFD0269BF13C27A59FAE5AFC,
 				8DA554B3DB00F7AD511CB330,
 				69057B232C024EEEF6C2BE82,
 				2DEA4DF8C8AB164A2BDCCFD9 /* Shared/LinearMotionTracker.swift */,
@@ -205,6 +217,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3007AEEE8458D5FF49FC5251,
+				7A08D02EB0D19E5B44C1CC27,
+				DF1C21F20D2D712A002D2C67,
 				2CE75FCD85ED976FF736694C,
 				FBC6150CD7F80A31B5861351,
 				880CC4EF48D0FB5D3D6DA492,
@@ -223,6 +238,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1A4436D6ADEE9E0005F43174,
 				02BB573173A852D3D4B72434,
 				4B76410B776203FCF59AE7C7,
 				4FDCC0F160A10F79471C8D7F /* Shared/LinearMotionTracker.swift in Sources */,

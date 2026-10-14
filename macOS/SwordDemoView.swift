@@ -44,11 +44,11 @@ struct SwordDemoView: View {
                     }.padding(20).background(MotionTheme.panel, in: RoundedRectangle(cornerRadius: 18))
                     VStack(alignment: .leading, spacing: 12) {
                         instruction("1", "Confirm your upright, steady neutral position.")
-                        instruction("2", "Move your hand to move the sword. Tilt forward to point forward.")
-                        instruction("3", "Slice edge-first. Twist your wrist to set the cutting plane.")
+                        instruction("2", "Hold the phone as the handle. The blade extends from its top edge.")
+                        instruction("3", "Swing and twist to slash. Hold steady to recenter without changing the angle.")
                     }
                     if let error = session.errorMessage { Text(error).font(.caption).foregroundStyle(.orange) }
-                    Text("Hand movement shifts the grip in 3D. Position is a short-motion estimate with 3× sensitivity; reset neutral if it drifts. Cuts follow the blade’s plane.")
+                    Text("Move the handle to move the grip; rotate it to swing the blade. A steady hold recenters position while keeping your angle. Translation is estimated with 3× sensitivity.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }.padding(24)
             }.frame(width: 340)
@@ -60,7 +60,7 @@ struct SwordDemoView: View {
                         Label("SWORD DEMO", systemImage: "sparkles").font(.caption.weight(.bold)).tracking(2)
                             .foregroundStyle(.orange)
                         Spacer()
-                        StatusPill(text: game.isAutoplay ? "Autoplay" : live ? "Phone control live" : session.deviceName != nil ? "Neutral setup required" : "Waiting for your phone", active: live)
+                        StatusPill(text: game.isAutoplay ? "Autoplay" : session.isSwordRecentering ? "Steady · angle preserved" : live ? "Phone control live" : session.deviceName != nil ? "Neutral setup required" : "Waiting for your phone", active: live)
                     }.padding(24)
                     Spacer()
                     if !game.isAutoplay && !session.isNeutralConfirmed {
@@ -85,7 +85,7 @@ struct SwordDemoView: View {
                                 else { game.watchDemo() }
                             } label: { Label(game.isAutoplay ? "Stop demo" : "Watch demo", systemImage: game.isAutoplay ? "stop.fill" : "play.fill") }
                         }.buttonStyle(.bordered).controlSize(.large)
-                        Text(game.isAutoplay ? "Preview · scripted sword swings" : "Move and rotate in 3D · estimated hand position · reset neutral anytime")
+                        Text(game.isAutoplay ? "Preview · scripted sword swings" : "Phone = sword handle · hold steady to recenter · angle preserved")
                             .font(.caption).foregroundStyle(.secondary)
                     }.padding(.bottom, 24)
                 }
