@@ -6,15 +6,16 @@ import SwiftUI
 struct WokArenaView: NSViewRepresentable {
     let session: MacSession
     let game: WokDemoState
+    var reduceMotion = false
     func makeCoordinator() -> Coordinator { Coordinator(session: session, game: game) }
     func makeNSView(context: Context) -> ARView {
         let view = ARView(frame: .zero)
         view.environment.background = .color(NSColor(red: 0.035, green: 0.065, blue: 0.08, alpha: 1))
-        view.setAccessibilityLabel("3D cooking station with a motion-controlled wok, burner, and fried egg")
+        view.setAccessibilityLabel("3D cooking station with a motion-controlled wok, fried egg, and serving plate")
         context.coordinator.build(view)
         return view
     }
-    func updateNSView(_ view: ARView, context: Context) {}
+    func updateNSView(_ view: ARView, context: Context) { context.coordinator.reduceMotion = reduceMotion }
     static func dismantleNSView(_ view: ARView, coordinator: Coordinator) { coordinator.subscription?.cancel() }
 
     @MainActor final class Coordinator {
@@ -24,6 +25,10 @@ struct WokArenaView: NSViewRepresentable {
         let pan = Entity(), egg = Entity()
         let white = ModelEntity(), underside = ModelEntity(), yolk = ModelEntity()
         var shells: [Entity] = [], steam: [ModelEntity] = [], flame: [ModelEntity] = []
+        var servedModels: [Int: Entity] = [:]
+        var confetti: [ModelEntity] = []
+        var sessionGeneration: UInt64 = 0
+        var reduceMotion = false
         var subscription: (any Cancellable)?
         var lastColor = -1
         var clock = 0.0
@@ -31,8 +36,8 @@ struct WokArenaView: NSViewRepresentable {
 
         func build(_ view: ARView) {
             let camera = PerspectiveCamera()
-            camera.camera.fieldOfViewInDegrees = 46
-            camera.look(at: [0, 0.35, 0.25], from: [0, 3.45, 4.7], relativeTo: nil)
+            camera.camera.fieldOfViewInDegrees = 48
+            camera.look(at: [0.22, 0.4, 0.25], from: [0.22, 3.65, 5.0], relativeTo: nil)
             root.addChild(camera)
             let light = DirectionalLight(); light.light.intensity = 3200
             light.look(at: .zero, from: [-2, 5, 3], relativeTo: nil); root.addChild(light)
@@ -42,6 +47,15 @@ struct WokArenaView: NSViewRepresentable {
             fill.position = [2, 2, -1]; root.addChild(fill)
             box(root, size: [4.5, 0.16, 3.8], at: [0, -0.65, 0.3], color: NSColor(red: 0.10, green: 0.17, blue: 0.18, alpha: 1))
             box(root, size: [3.7, 0.025, 3.1], at: [0, -0.55, 0.3], color: NSColor(white: 0.07, alpha: 1), metal: true)
+            let plate = Entity(); plate.position = WokGameEngine.platePosition
+            if let mesh = plateMesh() {
+                plate.addChild(ModelEntity(mesh: mesh, materials: [SimpleMaterial(color: NSColor(red: 0.96, green: 0.95, blue: 0.89, alpha: 1), roughness: 0.18, isMetallic: false)]))
+            }
+            if let mesh = ring(radius: 0.50, tube: 0.009) {
+                let trim = ModelEntity(mesh: mesh, materials: [SimpleMaterial(color: .systemTeal, roughness: 0.22, isMetallic: false)])
+                trim.position.y = 0.052; plate.addChild(trim)
+            }
+            root.addChild(plate)
             let burner = ModelEntity(mesh: cylinderMesh(height: 0.16, radius: 1.15) ?? .generateBox(size: [2.3, 0.16, 2.3]), materials: [SimpleMaterial(color: NSColor(white: 0.08, alpha: 1), roughness: 0.6, isMetallic: true)])
             burner.position.y = -0.39; root.addChild(burner)
             if let mesh = ring(radius: 0.83, tube: 0.026) {
@@ -74,13 +88,16 @@ struct WokArenaView: NSViewRepresentable {
             }
             root.addChild(pan)
             if let mesh = eggWhite(under: false) {
+                white.name = "Egg white"
                 white.model = ModelComponent(mesh: mesh, materials: [SimpleMaterial(color: .white, roughness: 0.25, isMetallic: false)])
                 egg.addChild(white)
             }
             if let mesh = eggWhite(under: true) {
+                underside.name = "Egg underside"
                 underside.model = ModelComponent(mesh: mesh, materials: [SimpleMaterial(color: .white, roughness: 0.4, isMetallic: false)])
                 egg.addChild(underside)
             }
+            yolk.name = "Egg yolk"
             yolk.model = ModelComponent(mesh: .generateSphere(radius: 1), materials: [SimpleMaterial(color: NSColor(red: 1, green: 0.59, blue: 0.03, alpha: 1), roughness: 0.13, isMetallic: false)])
             yolk.scale = [0.13, 0.085, 0.13]; yolk.position = [0.025, 0.04, -0.015]; egg.addChild(yolk)
             for index in 0..<18 {
@@ -103,6 +120,11 @@ struct WokArenaView: NSViewRepresentable {
                 let vapor = ModelEntity(mesh: .generateSphere(radius: 1), materials: [steamMaterial])
                 steam.append(vapor); root.addChild(vapor)
             }
+            let colors: [NSColor] = [.systemYellow, .systemMint, .systemOrange, .systemPink, .systemCyan]
+            for index in 0..<45 {
+                let piece = ModelEntity(mesh: .generateBox(size: [0.032, 0.009, 0.018]), materials: [UnlitMaterial(color: colors[index % colors.count])])
+                piece.isEnabled = false; confetti.append(piece); root.addChild(piece)
+            }
             view.scene.addAnchor(root)
             subscription = view.scene.subscribe(to: SceneEvents.Update.self) { [weak self] event in
                 let dt = event.deltaTime
@@ -113,10 +135,18 @@ struct WokArenaView: NSViewRepresentable {
         func tick(_ dt: Double) {
             guard dt.isFinite, dt > 0 else { return }
             clock += min(dt, 0.06)
-            game.tick(dt, session: session)
+            // RealityKit can throttle the window below 10 fps. Divide renderer
+            // intervals into valid simulation steps rather than discarding every
+            // slow frame. Large/background gaps contribute only a bounded step.
+            var remaining = min(dt, 0.25)
+            while remaining > 0.000001 {
+                let step = min(remaining, 0.05)
+                game.tick(step, session: session)
+                remaining -= step
+            }
             let engine = game.engine
             pan.position = engine.panPosition; pan.orientation = engine.panRotation.rotation
-            egg.isEnabled = engine.phase != .ready
+            egg.isEnabled = engine.phase != .ready && !(engine.phase == .served && game.cookingSession.currentRecorded)
             egg.position = engine.eggPosition; egg.orientation = engine.eggRotation.rotation
             let bucket = Int(engine.sear[0] * 20) + Int(engine.sear[1] * 20) * 25
             if bucket != lastColor {
@@ -126,13 +156,40 @@ struct WokArenaView: NSViewRepresentable {
                 white.model?.materials = [SimpleMaterial(color: NSColor(red: 1 - second * 0.2, green: 0.94 - second * 0.36, blue: 0.78 - second * 0.50, alpha: 1), roughness: .float(Float(0.25 + second * 0.35)), isMetallic: false)]
                 yolk.model?.materials = [SimpleMaterial(color: NSColor(red: 1, green: 0.57 + second * 0.17, blue: 0.04 + second * 0.15, alpha: 1), roughness: .float(Float(0.13 + second * 0.4)), isMetallic: false)]
             }
+            if sessionGeneration != game.cookingSession.generation {
+                for model in servedModels.values { model.removeFromParent() }
+                servedModels.removeAll(); sessionGeneration = game.cookingSession.generation
+            }
+            for saved in game.cookingSession.pile.eggs {
+                let model: Entity
+                if let existing = servedModels[saved.id] { model = existing }
+                else {
+                    model = egg.clone(recursive: true); model.isEnabled = true
+                    servedModels[saved.id] = model; root.addChild(model)
+                    colorFinishedEgg(model, sear: saved.sear)
+                }
+                model.position = saved.position; model.orientation = saved.rotation.rotation
+                model.isEnabled = saved.position.y > -3
+            }
+            let celebrationAge = Float(2.8 - game.celebrationRemaining)
+            for (index, piece) in confetti.enumerated() {
+                piece.isEnabled = game.celebrationRemaining > 0 && !reduceMotion
+                guard piece.isEnabled else { continue }
+                let angle = Float(index) * 2.39996
+                let spread = 0.45 + Float(index % 5) * 0.12
+                let velocity = SIMD3<Float>(cos(angle) * spread, 1.3 + Float(index % 7) * 0.13, sin(angle) * spread)
+                piece.position = game.celebrationPosition + [0, 0.15, 0] + velocity * celebrationAge
+                    + [0, -1.7 * celebrationAge * celebrationAge, 0]
+                piece.orientation = simd_quatf(angle: celebrationAge * (4 + Float(index % 4)), axis: simd_normalize(SIMD3<Float>(1, 0.4, sin(angle))))
+                piece.scale = SIMD3(repeating: min(1, Float(game.celebrationRemaining) / 0.6))
+            }
             for (index, shell) in shells.enumerated() {
                 shell.isEnabled = engine.phase == .cracking
                 let t = Float(engine.phaseTime), side: Float = index == 0 ? -1 : 1
                 shell.position = engine.panPosition + [side * min(0.8, t * 0.9), 1.55 + sin(t * 3) * 0.1, 0]
                 shell.orientation = simd_quatf(angle: side * t * 1.5, axis: [0, 0, 1])
             }
-            let hot = game.input.active && !engine.practiceMode && (engine.phase == .cooking || engine.phase == .airborne || engine.phase == .cracking)
+            let hot = game.playing && game.input.active && !engine.practiceMode && (engine.phase == .cooking || engine.phase == .airborne || engine.phase == .cracking)
             for (index, vapor) in steam.enumerated() {
                 vapor.isEnabled = hot && engine.sear[0] > 0.02
                 let age = Float((clock * 0.45 + Double(index) / 10).truncatingRemainder(dividingBy: 1))
@@ -144,6 +201,13 @@ struct WokArenaView: NSViewRepresentable {
                 fire.isEnabled = hot
                 fire.scale.y = 0.07 + Float(sin(clock * 8 + Double(index))) * 0.015
             }
+        }
+
+        func colorFinishedEgg(_ model: Entity, sear: [Double]) {
+            let first = min(1, sear[0]), second = min(1, sear[1])
+            (model.findEntity(named: "Egg underside") as? ModelEntity)?.model?.materials = [SimpleMaterial(color: NSColor(red: 1 - first * 0.3, green: 0.96 - first * 0.52, blue: 0.85 - first * 0.65, alpha: 1), roughness: 0.55, isMetallic: false)]
+            (model.findEntity(named: "Egg white") as? ModelEntity)?.model?.materials = [SimpleMaterial(color: NSColor(red: 1 - second * 0.2, green: 0.94 - second * 0.36, blue: 0.78 - second * 0.50, alpha: 1), roughness: 0.4, isMetallic: false)]
+            (model.findEntity(named: "Egg yolk") as? ModelEntity)?.model?.materials = [SimpleMaterial(color: NSColor(red: 1, green: 0.57 + second * 0.17, blue: 0.04 + second * 0.15, alpha: 1), roughness: 0.3, isMetallic: false)]
         }
 
         func box(_ parent: Entity, size: SIMD3<Float>, at position: SIMD3<Float>, color: NSColor, metal: Bool = false) {
@@ -195,6 +259,29 @@ struct WokArenaView: NSViewRepresentable {
                 }
             }
             return mesh(name: "Forged carbon steel wok", points: points, normals: normals, triangles: triangles)
+        }
+        func plateMesh() -> MeshResource? {
+            let rows = 20, columns = 80, radius: Float = 0.53
+            var points: [SIMD3<Float>] = [], normals: [SIMD3<Float>] = [], triangles: [UInt32] = []
+            for surface in 0..<2 {
+                let start = points.count
+                for row in 0...rows {
+                    let fraction = Float(row) / Float(rows), r = radius * fraction
+                    let y = 0.06 * pow(fraction, 4) - (surface == 0 ? 0 : 0.03)
+                    let slope = 0.24 * pow(fraction, 3) / radius
+                    for column in 0...columns {
+                        let angle = Float(column) * 2 * .pi / Float(columns)
+                        points.append([cos(angle) * r, y, sin(angle) * r])
+                        let normal = simd_normalize(SIMD3<Float>(-slope * cos(angle), 1, -slope * sin(angle)))
+                        normals.append(surface == 0 ? normal : -normal)
+                        if row < rows && column < columns {
+                            let a = UInt32(start + row * (columns + 1) + column), b = a + UInt32(columns + 1)
+                            triangles += surface == 0 ? [a, a + 1, b, a + 1, b + 1, b] : [a, b, a + 1, a + 1, b, b + 1]
+                        }
+                    }
+                }
+            }
+            return mesh(name: "Ceramic serving plate", points: points, normals: normals, triangles: triangles)
         }
         func ring(radius: Float, tube: Float) -> MeshResource? {
             let rows = 80, columns = 10

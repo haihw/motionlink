@@ -22,7 +22,7 @@ struct ReceiverVerification {
     }
     static func client(port: NWEndpoint.Port, code: String, log: MessageLog) -> LinkConnection {
         let channel = LinkConnection(NWConnection(host: "127.0.0.1", port: port, using: LinkSettings.parameters()))
-        channel.onReady = { [weak channel] in channel?.send(LinkMessage(kind: .hello, code: code, deviceName: "Verification iPhone")) }
+        channel.onReady = { [weak channel] in channel?.send(LinkMessage(kind: .hello, code: code, deviceName: "Verification iPhone", hapticCapabilities: HapticCapabilities(supportsHaptics: true))) }
         channel.onMessage = { message in log.messages.append(message) }
         channel.onClose = { _ in log.closed = true }
         channel.start()
@@ -48,6 +48,30 @@ struct ReceiverVerification {
         defer { sender.close() }
         try await waitUntil("correct pairing accepted") { log.messages.contains { $0.kind == .accepted } }
         try require(receiver.deviceName == "Verification iPhone", "Paired device was not recorded")
+        try require(receiver.haptics.isAvailable, "Haptic capabilities were not negotiated")
+        guard let effectID = receiver.haptics.play(.rumble(), loop: true, lifetime: 5) else {
+            throw NSError(domain: "MotionLinkVerification", code: 4)
+        }
+        try await waitUntil("haptic play delivered") { log.messages.contains { $0.hapticCommand?.playback?.id == effectID } }
+        let play = log.messages.compactMap(\.hapticCommand).first { $0.playback?.id == effectID }!
+        try require(play.isValid && play.playback?.loop == true, "Play command lost its bounded loop")
+        sender.send(LinkMessage(kind: .hapticResponse, hapticResponse: HapticResponse(requestID: play.requestID, playbackID: effectID, status: .accepted)))
+        try await waitUntil("play acknowledgement") { receiver.haptics.lastResponse?.status == .accepted }
+        receiver.haptics.update(effectID, parameters: HapticParameters(intensityScale: 0.25, sharpnessOffset: -0.2))
+        try await waitUntil("live haptic update delivered") { log.messages.contains { $0.hapticCommand?.action == .update } }
+        let update = log.messages.compactMap(\.hapticCommand).first { $0.action == .update }!
+        sender.send(LinkMessage(kind: .hapticResponse, hapticResponse: HapticResponse(requestID: update.requestID, playbackID: effectID, status: .updated)))
+        try await waitUntil("update acknowledgement") { receiver.haptics.lastResponse?.status == .updated }
+        receiver.haptics.stopAll()
+        try await waitUntil("stop-all delivered") { log.messages.contains { $0.hapticCommand?.action == .stopAll } }
+        let stop = log.messages.compactMap(\.hapticCommand).first { $0.action == .stopAll }!
+        sender.send(LinkMessage(kind: .hapticResponse, hapticResponse: HapticResponse(requestID: stop.requestID, status: .stopped)))
+        try await waitUntil("stop acknowledgement") { receiver.haptics.activePlayers.isEmpty }
+        sender.send(LinkMessage(kind: .hapticCapabilities, hapticCapabilities: HapticCapabilities(supportsHaptics: true, isEnabled: false)))
+        try await waitUntil("controller-side disable") { !receiver.haptics.isAvailable }
+        try require(receiver.haptics.play(.impact()) == nil, "Disabled controller accepted feedback")
+        sender.send(LinkMessage(kind: .hapticCapabilities, hapticCapabilities: HapticCapabilities(supportsHaptics: true)))
+        try await waitUntil("controller-side re-enable") { receiver.haptics.isAvailable }
         let busyLog = MessageLog()
         let busy = client(port: port, code: receiver.pairingCode, log: busyLog)
         try await waitUntil("second phone rejected") { busyLog.closed }
@@ -135,7 +159,8 @@ struct ReceiverVerification {
         try require(receiver.sample == nil, "Disconnected readings were not cleared")
         try require(!receiver.movement.isAvailable && receiver.movement.speed == 0, "Disconnected speed was not cleared")
         try require(receiver.pairingCode != pairedCode, "Pairing code did not rotate")
-        print("PASS: incorrect code, pairing, one-phone limit, motion vectors, speed reset, calibration, pause/resume, explicit neutral confirmation/reset, 3D grip translation, steady recenter with angle preserved, sequence ordering, invalid-sample disconnect.")
+        try require(!receiver.haptics.isAvailable && receiver.haptics.activePlayers.isEmpty, "Disconnect retained controller feedback state")
+        print("PASS: protocol 3 haptic capabilities, play/update/stop-all commands and acknowledgements, controller disable/re-enable, feedback cleanup, incorrect code, pairing, one-phone limit, motion vectors, speed reset, calibration, pause/resume, neutral confirmation, translation, sequence ordering, invalid-sample disconnect.")
     }
 }
 

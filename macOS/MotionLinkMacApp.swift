@@ -20,8 +20,10 @@ struct MotionLinkMacApp: App {
 struct MacView: View {
     let session: MacSession
     @State private var mode = Mode.sword
+    @State private var drawing = DrawingDemoState()
+    @State private var maze = LaserMazeState()
     enum Mode: String, CaseIterable, Identifiable {
-        case studio = "Motion Studio", sword = "Sword Demo", wok = "Wok Demo"
+        case studio = "Motion Studio", sword = "Sword Demo", wok = "Wok Demo", drawing = "Drawing Demo", maze = "Maze Demo"
         var id: Self { self }
     }
     var body: some View {
@@ -31,7 +33,7 @@ struct MacView: View {
                 Text("MotionLink").font(.title2.bold())
                 Picker("View", selection: $mode) {
                     ForEach(Mode.allCases) { Text($0.rawValue).tag($0) }
-                }.pickerStyle(.segmented).frame(width: 430).padding(.leading, 16)
+                }.pickerStyle(.segmented).labelsHidden().frame(width: 600).padding(.leading, 16)
                 Spacer()
                 StatusPill(text: session.isDemo ? "Demo motion" : session.status,
                            active: session.deviceName != nil && !session.isPaused && !session.isStale)
@@ -40,7 +42,9 @@ struct MacView: View {
             Divider().overlay(.white.opacity(0.04))
             if mode == .studio { studio }
             else if mode == .sword { SwordDemoView(session: session) }
-            else { WokDemoView(session: session) }
+            else if mode == .wok { WokDemoView(session: session) }
+            else if mode == .drawing { DrawingDemoView(session: session, drawing: drawing) }
+            else { LaserMazeView(session: session, maze: maze) }
         }.background(MotionTheme.background)
             .onChange(of: mode) { _, mode in
                 if mode != .studio && session.isDemo { session.toggleDemo() }
@@ -113,6 +117,7 @@ struct MacPairingCard: View {
                 Text(neutralInstruction)
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Button("Disconnect phone", role: .destructive) { session.disconnect() }
+                ControllerFeedbackPanel(feedback: session.haptics)
             } else {
                 Text("CONNECT YOUR IPHONE").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 Text(session.pairingCode).font(.system(size: 36, weight: .semibold, design: .monospaced)).tracking(5)
@@ -126,6 +131,40 @@ struct MacPairingCard: View {
         }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
             .background(MotionTheme.panel, in: RoundedRectangle(cornerRadius: 18))
     }
+}
+
+private struct ControllerFeedbackPanel: View {
+    let feedback: ControllerHaptics
+    @State private var strength = 0.5
+    @State private var rumbleID: UUID?
+    var body: some View {
+        DisclosureGroup("Controller feedback") {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(feedback.isAvailable ? "Haptics ready" : "Haptics unavailable or paused on phone")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Button("Tap") { feedback.play(.impact(intensity: Float(strength))) }
+                    Button("Success") { feedback.play(.success) }
+                }.disabled(!feedback.isAvailable)
+                Button(rumbling ? "Stop rumble" : "Rumble · 8 seconds") {
+                    if rumbling, let rumbleID { feedback.stop(rumbleID); self.rumbleID = nil }
+                    else { rumbleID = feedback.play(.rumble(), loop: true, lifetime: 8, parameters: HapticParameters(intensityScale: Float(strength))) }
+                }.disabled(!feedback.isAvailable)
+                Slider(value: $strength, in: 0...1) { Text("Feedback strength") }
+                    .disabled(!feedback.isAvailable)
+                    .onChange(of: strength) { _, value in
+                        if rumbling, let rumbleID { feedback.update(rumbleID, parameters: HapticParameters(intensityScale: Float(value))) }
+                    }
+                Button("Stop all feedback") { feedback.stopAll(); rumbleID = nil }
+                if let response = feedback.lastResponse {
+                    Text(response.detail ?? response.reason?.rawValue ?? response.status.rawValue)
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+            }.padding(.top, 8)
+        }.font(.callout)
+            .onDisappear { if let rumbleID { feedback.stop(rumbleID) } }
+    }
+    private var rumbling: Bool { rumbleID.map { feedback.activePlayers.contains($0) } ?? false }
 }
 
 #Preview { MacView(session: MacSession()).frame(width: 1160, height: 780).preferredColorScheme(.dark) }

@@ -23,6 +23,7 @@ final class MacSession {
     var isStale = false
     var isDemo = false
     var macName = Host.current().localizedName ?? "MotionLink Mac"
+    let haptics = ControllerHaptics()
 
     @ObservationIgnored private var neutralMonitor = NeutralPoseMonitor()
     @ObservationIgnored private var motionTracker = LinearMotionTracker()
@@ -122,10 +123,23 @@ final class MacSession {
                 self.deviceName = String((message.deviceName ?? "iPhone").prefix(80))
                 self.status = "Connected · waiting for motion"
                 self.errorMessage = nil
+                self.haptics.connect(capabilities: message.hapticCapabilities) { [weak channel] command in
+                    channel?.send(LinkMessage(kind: .hapticCommand, hapticCommand: command)) ?? false
+                }
                 channel.send(LinkMessage(kind: .accepted))
                 return
             }
             switch message.kind {
+            case .hapticCapabilities:
+                guard let capabilities = message.hapticCapabilities, capabilities.isValid else {
+                    channel.close(reason: "Invalid controller capabilities"); return
+                }
+                self.haptics.setCapabilities(capabilities)
+            case .hapticResponse:
+                guard let response = message.hapticResponse, response.isValid else {
+                    channel.close(reason: "Invalid controller feedback response"); return
+                }
+                self.haptics.receive(response)
             case .motion:
                 guard let sample = message.sample, sample.isValid else {
                     channel.close(reason: "Invalid motion sample"); return
@@ -163,6 +177,7 @@ final class MacSession {
         channel.onClose = { [weak self, weak channel] reason in
             guard let self, self.link === channel else { return }
             self.link = nil; self.deviceName = nil
+            self.haptics.disconnect()
             self.pairTimeout?.cancel()
             self.sample = nil; self.reference = nil; self.lastArrival = nil
             self.resetNeutralPosition()

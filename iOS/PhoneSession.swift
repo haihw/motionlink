@@ -21,11 +21,14 @@ final class PhoneSession {
     var movement = MotionEstimate.unavailable
     var errorMessage: String?
     var pairingCode = ""
+    var hapticsEnabled = true
+    var supportsHaptics: Bool { haptics.capabilities.supportsHaptics }
     var hasMotion: Bool { motion.isDeviceMotionAvailable }
 
     @ObservationIgnored private var motionTracker = LinearMotionTracker()
     @ObservationIgnored private var reference: MotionQuaternion?
     @ObservationIgnored private let motion = CMMotionManager()
+    @ObservationIgnored private let haptics = PhoneHaptics()
     @ObservationIgnored private var browser: NWBrowser?
     @ObservationIgnored private var link: LinkConnection?
     @ObservationIgnored private var motionTask: Task<Void, Never>?
@@ -71,17 +74,26 @@ final class PhoneSession {
         link = channel
         channel.onReady = { [weak self, weak channel] in
             guard let self, let channel, self.link === channel else { return }
-            channel.send(LinkMessage(kind: .hello, code: self.pairingCode, deviceName: UIDevice.current.name))
+            channel.send(LinkMessage(kind: .hello, code: self.pairingCode, deviceName: UIDevice.current.name, hapticCapabilities: self.haptics.capabilities))
+        }
+        haptics.onResponse = { [weak self, weak channel] response in
+            guard let self, let channel, self.link === channel, self.connectedName != nil else { return }
+            channel.send(LinkMessage(kind: .hapticResponse, hapticResponse: response))
         }
         channel.onMessage = { [weak self, weak channel] message in
             guard let self, let channel, self.link === channel else { return }
             switch message.kind {
             case .accepted:
+                guard self.isConnecting, self.connectedName == nil else { return }
                 self.timeout?.cancel()
                 self.isConnecting = false
                 self.connectedName = mac.name
                 self.status = "Connected"
                 self.startMotion()
+                self.publishHapticCapabilities()
+            case .hapticCommand:
+                guard self.connectedName != nil, let command = message.hapticCommand else { return }
+                self.haptics.handle(command)
             case .calibrate:
                 self.reference = self.sample?.attitude
                 self.resetMovement()
@@ -95,6 +107,7 @@ final class PhoneSession {
         channel.onClose = { [weak self, weak channel] reason in
             guard let self, self.link === channel else { return }
             self.stopMotion()
+            self.haptics.disconnect()
             self.link = nil
             self.connectedName = nil
             self.sample = nil
@@ -119,6 +132,17 @@ final class PhoneSession {
         } else { startMotion() }
     }
 
+    func setHapticsEnabled(_ value: Bool) {
+        hapticsEnabled = value
+        haptics.setEnabled(value && connectedName != nil && isStreaming)
+        publishHapticCapabilities()
+    }
+
+    private func publishHapticCapabilities() {
+        guard connectedName != nil else { return }
+        link?.send(LinkMessage(kind: .hapticCapabilities, hapticCapabilities: haptics.capabilities))
+    }
+
     func calibrate() {
         reference = sample?.attitude
         resetMovement()
@@ -134,6 +158,7 @@ final class PhoneSession {
     func disconnect() {
         timeout?.cancel()
         stopMotion()
+        haptics.disconnect()
         link?.close(reason: "Disconnected")
         link = nil
         connectedName = nil
@@ -169,6 +194,8 @@ final class PhoneSession {
         motion.deviceMotionUpdateInterval = 1.0 / 60
         motion.startDeviceMotionUpdates(using: .xArbitraryZVertical)
         isStreaming = true
+        haptics.setEnabled(hapticsEnabled)
+        publishHapticCapabilities()
         status = "Streaming live motion"
         UIApplication.shared.isIdleTimerDisabled = true
         motionTask = Task { [weak self] in
@@ -207,6 +234,8 @@ final class PhoneSession {
         motionTask?.cancel(); motionTask = nil
         motion.stopDeviceMotionUpdates()
         isStreaming = false
+        haptics.setEnabled(false)
+        publishHapticCapabilities()
         resetMovement()
         UIApplication.shared.isIdleTimerDisabled = false
     }

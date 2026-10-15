@@ -133,6 +133,7 @@ struct SwordArenaView: NSViewRepresentable {
             for hit in engine.step(pose: pose, deltaTime: deltaTime, hasSwingEnergy: energy, time: time) {
                 slice(hit)
                 game.cuts.insert(hit.targetID)
+                if live && !autoplay { session.haptics.play(.impact(intensity: 0.8, sharpness: 0.75)) }
             }
             if energy && (live || autoplay) { tipHistory.append((pose.tip, time)) }
             tipHistory.removeAll { time - $0.time > 0.23 }

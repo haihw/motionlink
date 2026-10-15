@@ -76,6 +76,8 @@ final class LinkConnection {
                     if let error { self.close(reason: error.localizedDescription) }
                     else if complete { self.close(reason: "The other app disconnected") }
                     else { self.receive() }
+                } catch FrameDecoder.FrameError.unsupportedVersion {
+                    self.close(reason: "Protocol mismatch. Update both MotionLink apps, then pair again.")
                 } catch { self.close(reason: "Invalid or incompatible data received") }
             }
         }

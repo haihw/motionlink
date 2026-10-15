@@ -52,14 +52,17 @@ struct MotionSample: Codable, Sendable {
 }
 
 struct LinkMessage: Codable, Sendable {
-    static let protocolVersion = 2
-    enum Kind: String, Codable, Sendable { case hello, accepted, rejected, motion, paused, calibrate, resetMovement }
+    static let protocolVersion = 3
+    enum Kind: String, Codable, Sendable { case hello, accepted, rejected, motion, paused, calibrate, resetMovement, hapticCapabilities, hapticCommand, hapticResponse }
     var version = protocolVersion
     var kind: Kind
     var code: String?
     var deviceName: String?
     var reason: String?
     var sample: MotionSample?
+    var hapticCapabilities: HapticCapabilities?
+    var hapticCommand: HapticCommand?
+    var hapticResponse: HapticResponse?
 }
 
 /// TCP is a byte stream: packets may be split or coalesced arbitrarily.

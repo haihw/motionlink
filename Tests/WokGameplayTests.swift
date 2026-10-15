@@ -9,6 +9,20 @@ private func cookUntil(_ engine: inout WokGameEngine, _ condition: (WokGameEngin
     }
 }
 
+private func tossEgg(_ game: inout WokGameEngine, big: Bool = false) {
+    let sequence = UInt64(10000 + game.attempts * 100)
+    game.step(deltaTime: 1.0 / 60, input: WokInput(acceleration: [0, big ? 14 : 7, -4], gyro: [1, 0, 0], sampleID: sequence))
+    for tick in 1...6 { game.step(deltaTime: 1.0 / 60, input: WokInput(sampleID: sequence + UInt64(tick))) }
+}
+
+private func cookedEgg(target: EggDoneness = .medium) -> WokGameEngine {
+    var game = WokGameEngine(); game.start(target: target)
+    cookUntil(&game) { $0.sear[0] >= 0.61 }
+    tossEgg(&game)
+    cookUntil(&game) { $0.readyToServe }
+    return game
+}
+
 @Test("Starting cracks and drops a fresh egg before searing begins")
 func freshWokEgg() {
     var game = WokGameEngine()
@@ -81,7 +95,6 @@ func wokTargetRound(target: EggDoneness) {
     var game = WokGameEngine(); game.start(target: target)
     for tick in 0..<3600 {
         game.step(deltaTime: 1.0 / 60, input: .autoplay(engine: game, sampleID: UInt64(tick)))
-        if game.readyToServe { game.serve(); break }
         if game.finished { break }
     }
     #expect(game.phase == .served)
@@ -99,18 +112,98 @@ func wokPauseAndGaps() {
     #expect(game.sear == level && game.elapsed == elapsed && game.attempts == 0)
 }
 
-@Test("Overcooking, premature serving, and excessive tilt have distinct outcomes")
+@Test("Overcooking and excessive tilt have distinct outcomes")
 func wokFailureOutcomes() {
     var burnt = WokGameEngine(); burnt.start(target: .soft)
     cookUntil(&burnt) { $0.finished }
     #expect(burnt.phase == .burnt)
-    var raw = WokGameEngine(); raw.start(target: .firm)
-    cookUntil(&raw) { $0.phase == .cooking }
-    raw.serve(); #expect(raw.phase == .served && raw.rating == 1)
     var tipped = WokGameEngine(); tipped.start(target: .medium)
     cookUntil(&tipped) { $0.phase == .cooking }
     for tick in 0..<300 { tipped.step(deltaTime: 1.0 / 60, input: WokInput(rotation: MotionQuaternion(simd_quatf(angle: 1.4, axis: [0, 0, 1])), sampleID: UInt64(tick))) }
     #expect(tipped.phase == .lost)
+}
+
+@Test("A big toss serves only when both egg faces reach their cooking thresholds", arguments: [false, true])
+func wokBigTossBeforeReady(firstSideDone: Bool) {
+    var game = WokGameEngine(); game.start(target: .medium)
+    cookUntil(&game) { firstSideDone ? $0.sear[0] >= 0.61 : $0.phase == .cooking }
+    if firstSideDone {
+        tossEgg(&game)
+        cookUntil(&game) { $0.phase == .cooking }
+    }
+    #expect(!game.readyToServe)
+    tossEgg(&game, big: true)
+    #expect(game.phase == .airborne && game.lastFlipTurns == 2)
+    #expect(!game.finished)
+}
+
+@Test("Cooking the second face alone cannot unlock serving", arguments: EggDoneness.allCases)
+func wokBothFacesRequired(target: EggDoneness) {
+    var game = WokGameEngine(); game.start(target: target)
+    cookUntil(&game) { $0.sear[0] >= 0.25 }
+    tossEgg(&game)
+    cookUntil(&game) { $0.sear[1] >= target.target.lowerBound + 0.02 }
+    #expect(!game.readyToServe)
+    tossEgg(&game, big: true)
+    #expect(game.phase == .airborne && !game.finished)
+}
+
+@Test("A normal toss still flips a cooked egg rather than serving it")
+func wokNormalTossWhenReady() {
+    var game = cookedEgg()
+    #expect(game.readyToServe)
+    tossEgg(&game)
+    #expect(game.phase == .airborne && game.lastFlipTurns == 1)
+    cookUntil(&game) { $0.phase == .cooking }
+    #expect(game.flips == 2 && !game.finished)
+}
+
+@Test("A serving toss freezes heat and catches upright on the fixed plate despite wok movement")
+func wokServingPlateCatch() {
+    var game = cookedEgg()
+    tossEgg(&game, big: true)
+    #expect(game.phase == .serving && !game.finished && game.flips == 1)
+    let sear = game.sear, start = game.eggPosition
+    for tick in 0..<24 {
+        game.step(deltaTime: 1.0 / 60, input: WokInput(sampleID: UInt64(30000 + tick)))
+    }
+    #expect(game.eggPosition.y > start.y + 0.7)
+    #expect(game.eggPosition.x > start.x && game.eggPosition.x < WokGameEngine.plateCatchPosition.x)
+    #expect(game.sear == sear && !game.finished)
+    for tick in 0..<90 {
+        game.step(deltaTime: 1.0 / 60, input: WokInput(rotation: MotionQuaternion(simd_quatf(angle: 0.3, axis: [1, 0, 0])), translation: [-0.2, 0.1, -0.1], sampleID: UInt64(40000 + tick)))
+    }
+    #expect(game.phase == .served && game.finished && game.rating == 3)
+    #expect(game.sear == sear && game.flips == 1)
+    #expect(game.eggPosition == WokGameEngine.plateCatchPosition)
+    #expect(game.eggRotation == .identity)
+    #expect(simd_distance(game.panPosition, game.eggPosition) > 1)
+    #expect(game.feedback.contains("plate"))
+    game.step(deltaTime: 0.05, input: WokInput(translation: [0.2, 0, 0], sampleID: 50000))
+    #expect(game.eggPosition == WokGameEngine.plateCatchPosition && game.attempts == 2)
+}
+
+@Test("An egg past the ideal band can still be served with a lower timing score")
+func wokLatePlateCatch() {
+    var game = cookedEgg(target: .soft)
+    cookUntil(&game) { $0.sear[1] >= 0.40 }
+    #expect(game.readyToServe)
+    tossEgg(&game, big: true)
+    #expect(game.phase == .serving)
+    cookUntil(&game) { $0.finished }
+    #expect(game.phase == .served && game.rating == 1)
+    #expect(game.feedback.contains("Past the target"))
+}
+
+@Test("Pausing a serving flight waits for fresh input before completing the plate catch")
+func wokServingPause() {
+    var game = cookedEgg(); tossEgg(&game, big: true)
+    let position = game.eggPosition, elapsed = game.elapsed
+    game.step(deltaTime: 0.05, input: WokInput(active: false))
+    game.step(deltaTime: 5, input: WokInput())
+    #expect(game.phase == .serving && game.eggPosition == position && game.elapsed == elapsed)
+    cookUntil(&game) { $0.finished }
+    #expect(game.phase == .served)
 }
 
 @Test("A flick-triggered flip follows a moving wok and lands on the opposite side")
@@ -209,9 +302,9 @@ func wokGravityFrame() {
 @Test("Wok translation follows estimated metres directly and holds when stationary")
 func wokDirectTranslation() {
     var tracker = WokTranslationTracker()
-    let estimate = MotionEstimate(velocity: MotionVector(x: 0.2, y: 0, z: -0.1), isAvailable: true)
+    let estimate = MotionEstimate(velocity: MotionVector(x: 0.08, y: 0, z: -0.04), isAvailable: true)
     for tick in 0...60 { _ = tracker.update(estimate, timestamp: Double(tick) / 60) }
-    #expect(simd_distance(tracker.displacement, [0.2, 0, -0.1]) < 0.0001)
+    #expect(simd_distance(tracker.displacement, [0.08, 0, -0.04]) < 0.0001)
     _ = tracker.update(MotionEstimate(isAvailable: true), timestamp: 61.0 / 60)
     let stopped = tracker.displacement
     for tick in 62...120 { _ = tracker.update(MotionEstimate(isAvailable: true), timestamp: Double(tick) / 60) }
@@ -312,4 +405,100 @@ func wokPushThenLiftGesture() throws {
     #expect(detector.update(WokInput(acceleration: [0, 0, -4], sampleID: 1), time: 0) == nil)
     #expect(detector.update(WokInput(acceleration: [0, 7, 0], sampleID: 2), time: 0.5) == nil)
     #expect(detector.update(WokInput(sampleID: 3), time: 0.7) == nil)
+}
+
+@Test("The wok stays in a circular stove support range and cannot sink below it")
+func wokStoveRange() {
+    var tracker = WokTranslationTracker()
+    for tick in 0...300 {
+        _ = tracker.update(MotionEstimate(velocity: MotionVector(x: 2, y: -1, z: 2), isAvailable: true), timestamp: Double(tick) / 60)
+        let offset = tracker.displacement
+        #expect(simd_length(SIMD2<Float>(offset.x, offset.z)) <= WokTranslationTracker.horizontalLimit + 0.000001)
+        #expect(offset.y == 0)
+    }
+    #expect(simd_length(SIMD2<Float>(tracker.displacement.x, tracker.displacement.z)) > 0.20)
+    for tick in 301...600 {
+        _ = tracker.update(MotionEstimate(velocity: MotionVector(x: 0, y: 2, z: 0), isAvailable: true), timestamp: Double(tick) / 60)
+        #expect(tracker.displacement.y <= WokTranslationTracker.liftLimit + 0.000001)
+    }
+    #expect(tracker.displacement.y > 0.11)
+}
+
+@Test("The stove edge resists outward movement and reverses immediately without windup")
+func wokSoftEdgeAndReverse() {
+    var tracker = WokTranslationTracker()
+    let outward = MotionEstimate(velocity: MotionVector(x: 0.3, y: 0, z: 0), isAvailable: true)
+    var earlyStep: Float = 0, lateStep: Float = 0
+    for tick in 0...300 {
+        let before = tracker.displacement.x
+        _ = tracker.update(outward, timestamp: Double(tick) / 60)
+        if tick == 10 { earlyStep = tracker.displacement.x - before }
+        if tick == 300 { lateStep = tracker.displacement.x - before }
+    }
+    #expect(earlyStep > 0.004)
+    #expect(lateStep < earlyStep * 0.1)
+    let edge = tracker.displacement.x
+    let inward = MotionEstimate(velocity: MotionVector(x: -0.3, y: 0, z: 0), isAvailable: true)
+    _ = tracker.update(inward, timestamp: 301.0 / 60)
+    _ = tracker.update(inward, timestamp: 302.0 / 60)
+    #expect(tracker.displacement.x < edge - 0.004)
+}
+
+@Test("Circular stirring remains responsive inside the stove's free range")
+func wokSmallCircleRange() {
+    var tracker = WokTranslationTracker()
+    let angularSpeed: Float = 3, radius: Float = 0.05
+    for tick in 0...360 {
+        let t = Float(tick) / 60
+        let velocity = SIMD3<Float>(radius * angularSpeed * cos(t * angularSpeed), 0, radius * angularSpeed * sin(t * angularSpeed))
+        let position = tracker.update(MotionEstimate(velocity: MotionVector(velocity), isAvailable: true), timestamp: Double(tick) / 60)
+        let expected = SIMD3<Float>(radius * sin(t * angularSpeed), 0, radius * (1 - cos(t * angularSpeed)))
+        #expect(simd_distance(position, expected) < 0.0001)
+    }
+}
+
+@Test("An egg resting in a level wok heats at exactly twice the normal rate")
+func wokRestingDoubleHeat() {
+    var game = WokGameEngine(); game.start(target: .medium)
+    cookUntil(&game) { $0.phase == .cooking }
+    for tick in 0..<30 { game.step(deltaTime: 1.0 / 60, input: WokInput(sampleID: UInt64(4000 + tick))) }
+    #expect(game.heatingMultiplier == 2)
+    let before = game.sear[0]
+    for tick in 0..<60 { game.step(deltaTime: 1.0 / 60, input: WokInput(sampleID: UInt64(5000 + tick))) }
+    #expect(abs((game.sear[0] - before) - 0.10) < 0.00001)
+    #expect(game.phase == .cooking && game.heatingMultiplier == 2)
+}
+
+@Test("Circular stirring keeps normal heat while the egg slides relative to the bowl")
+func wokStirringNormalHeat() {
+    var game = WokGameEngine(); game.start(target: .medium)
+    cookUntil(&game) { $0.phase == .cooking }
+    let before = game.sear[0]
+    var normalHeatFrames = 0
+    for tick in 0..<180 {
+        let time = Float(tick + 1) / 60, angle = time * 3
+        let ramp = min(1, time / 0.5)
+        let position = SIMD3<Float>(0.12 * ramp * sin(angle), 0, 0.12 * ramp * (1 - cos(angle)))
+        game.step(deltaTime: 1.0 / 60, input: WokInput(translation: position, sampleID: UInt64(10000 + tick)))
+        if game.heatingMultiplier == 1 { normalHeatFrames += 1 }
+    }
+    #expect(normalHeatFrames > 150)
+    #expect(game.sear[0] - before < 0.17)
+    #expect(game.phase == .cooking)
+}
+
+@Test("Resting bonus never heats an airborne egg or a heat-off practice egg")
+func wokDoubleHeatContactOnly() {
+    var practice = WokGameEngine(); practice.start(target: .medium, practice: true)
+    let initial = practice.sear
+    for tick in 0..<600 { practice.step(deltaTime: 1.0 / 60, input: WokInput(sampleID: UInt64(tick))) }
+    #expect(practice.sear == initial && practice.heatingMultiplier == 0)
+    var game = WokGameEngine(); game.start(target: .medium)
+    cookUntil(&game) { $0.sear[0] >= 0.61 }
+    #expect(game.heatingMultiplier == 2)
+    tossEgg(&game)
+    #expect(game.phase == .airborne && game.heatingMultiplier == 0)
+    let sear = game.sear
+    for tick in 0..<20 { game.step(deltaTime: 1.0 / 60, input: WokInput(sampleID: UInt64(30000 + tick))) }
+    #expect(game.sear == sear && game.heatingMultiplier == 0)
 }

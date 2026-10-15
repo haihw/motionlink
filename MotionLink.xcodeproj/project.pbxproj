@@ -5,6 +5,36 @@
 	};
 	objectVersion = 56;
 	objects = {
+		5639D5B91C18235DFE0D4878 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/MazeLeaderboard.swift"; sourceTree = SOURCE_ROOT; };
+		AA289884C731D78451E86F9B = {isa = PBXBuildFile; fileRef = 5639D5B91C18235DFE0D4878; };
+		107220AEF11607A169FC22EC = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/MazeLeaderboard.swift"; sourceTree = SOURCE_ROOT; };
+		F4C20611673CCEB9454E9086 = {isa = PBXBuildFile; fileRef = 107220AEF11607A169FC22EC; };
+		F738D4948E3EB039EB80798C = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/LaserMazeGameplay.swift"; sourceTree = SOURCE_ROOT; };
+		5CF3F8F09602C29136FB88EA = {isa = PBXBuildFile; fileRef = F738D4948E3EB039EB80798C; };
+		5764DF4DD0196A2CA43F3CD0 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/TiltControls.swift"; sourceTree = SOURCE_ROOT; };
+		FE75622F6BA189C00350339F = {isa = PBXBuildFile; fileRef = 5764DF4DD0196A2CA43F3CD0; };
+		9394ABCB6F05B2005D3C2357 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "macOS/LaserMazeView.swift"; sourceTree = SOURCE_ROOT; };
+		51478E05F9D68BCA8805EFF1 = {isa = PBXBuildFile; fileRef = 9394ABCB6F05B2005D3C2357; };
+		857BA40A761318042E3686F0 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/LaserMazeGameplay.swift"; sourceTree = SOURCE_ROOT; };
+		303305361FC0B2DEC84E66D6 = {isa = PBXBuildFile; fileRef = 857BA40A761318042E3686F0; };
+		04F4411D094BE33132B444B3 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/TiltControls.swift"; sourceTree = SOURCE_ROOT; };
+		7204DD8D84C6C362150AD4A0 = {isa = PBXBuildFile; fileRef = 04F4411D094BE33132B444B3; };
+		08CC7B687A6FE35E6DC6E901 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/DrawingGameplay.swift"; sourceTree = SOURCE_ROOT; };
+		E1E0898FF70E65EFEC6088BF = {isa = PBXBuildFile; fileRef = 08CC7B687A6FE35E6DC6E901; };
+		1F686E6BBF3FC200D87CA8CF = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "macOS/DrawingDemoView.swift"; sourceTree = SOURCE_ROOT; };
+		B83E79ABAC946CF056CBF8B5 = {isa = PBXBuildFile; fileRef = 1F686E6BBF3FC200D87CA8CF; };
+		60C9253868F2DDA77339FED8 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/DrawingGameplay.swift"; sourceTree = SOURCE_ROOT; };
+		BBA5CA49520A03900CC344A8 = {isa = PBXBuildFile; fileRef = 60C9253868F2DDA77339FED8; };
+		68BAD501B1998CAAB1E9D916 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/ControllerHapticsClient.swift"; sourceTree = SOURCE_ROOT; };
+		674B79023F82D9F60AC8DC10 = {isa = PBXBuildFile; fileRef = 68BAD501B1998CAAB1E9D916; };
+		EE8EF975250FCC6486B8C4B0 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/ControllerHapticsClient.swift"; sourceTree = SOURCE_ROOT; };
+		D7168D5A1D468E2B8263A8CC = {isa = PBXBuildFile; fileRef = EE8EF975250FCC6486B8C4B0; };
+		7EB2351C68CE72285F0AA2B1 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/ControllerHaptics.swift"; sourceTree = SOURCE_ROOT; };
+		9A3BB6D2BCCE309950FC9DAA = {isa = PBXBuildFile; fileRef = 7EB2351C68CE72285F0AA2B1; };
+		B40DCC906B1EA16AFE4E7462 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "iOS/PhoneHaptics.swift"; sourceTree = SOURCE_ROOT; };
+		40D05213F2DB386C8723C400 = {isa = PBXBuildFile; fileRef = B40DCC906B1EA16AFE4E7462; };
+		EAB641C8F98B783B5BDF1D8B = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/ControllerHaptics.swift"; sourceTree = SOURCE_ROOT; };
+		8563DE51A15BAA8540E3B833 = {isa = PBXBuildFile; fileRef = EAB641C8F98B783B5BDF1D8B; };
 		DFD0269BF13C27A59FAE5AFC = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/WokGameplay.swift"; sourceTree = SOURCE_ROOT; };
 		1A4436D6ADEE9E0005F43174 = { isa = PBXBuildFile; fileRef = DFD0269BF13C27A59FAE5AFC; };
 		52988277A823F7A8E8E4AA2C = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "macOS/WokArenaView.swift"; sourceTree = SOURCE_ROOT; };
@@ -92,6 +122,22 @@
 				9CDF98FF5E346A8745B4C58B /* macOS/MacSession.swift */,
 				20082681BA43803EA99D2717 /* macOS/MotionLinkMacApp.swift */,
 				82BAC61C6E3543F8F16DDA10 /* macOS/PhoneModelView.swift */,
+			
+				7EB2351C68CE72285F0AA2B1,
+			
+				EE8EF975250FCC6486B8C4B0,
+			
+				60C9253868F2DDA77339FED8,
+			
+				1F686E6BBF3FC200D87CA8CF,
+			
+				04F4411D094BE33132B444B3,
+			
+				857BA40A761318042E3686F0,
+			
+				9394ABCB6F05B2005D3C2357,
+			
+				107220AEF11607A169FC22EC,
 			);
 			name = MotionLinkMac;
 			sourceTree = "<group>";
@@ -108,6 +154,20 @@
 				EAA97C91FCAAFD0B1C3C4319 /* Shared/Theme.swift */,
 				823EB43B14074B945267557A /* iOS/MotionLinkPhoneApp.swift */,
 				2E7EDE560F818ADB3D1BBD77 /* iOS/PhoneSession.swift */,
+			
+				EAB641C8F98B783B5BDF1D8B,
+			
+				B40DCC906B1EA16AFE4E7462,
+			
+				68BAD501B1998CAAB1E9D916,
+			
+				08CC7B687A6FE35E6DC6E901,
+			
+				5764DF4DD0196A2CA43F3CD0,
+			
+				F738D4948E3EB039EB80798C,
+			
+				5639D5B91C18235DFE0D4878,
 			);
 			name = MotionLinkPhone;
 			sourceTree = "<group>";
@@ -231,6 +291,22 @@
 				373EDFBC07274AB21EAD4ECF /* macOS/MacSession.swift in Sources */,
 				3E7262104F012A3CEAE23644 /* macOS/MotionLinkMacApp.swift in Sources */,
 				6E0E07FDC93726B25388CE0F /* macOS/PhoneModelView.swift in Sources */,
+			
+				9A3BB6D2BCCE309950FC9DAA,
+			
+				D7168D5A1D468E2B8263A8CC,
+			
+				BBA5CA49520A03900CC344A8,
+			
+				B83E79ABAC946CF056CBF8B5,
+			
+				7204DD8D84C6C362150AD4A0,
+			
+				303305361FC0B2DEC84E66D6,
+			
+				51478E05F9D68BCA8805EFF1,
+			
+				F4C20611673CCEB9454E9086,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -247,6 +323,20 @@
 				7300A4EAA5487D922CB1A082 /* Shared/Theme.swift in Sources */,
 				57ECE6B2A71DB91301A5A9F8 /* iOS/MotionLinkPhoneApp.swift in Sources */,
 				9A17221FE949C55A53BEADDB /* iOS/PhoneSession.swift in Sources */,
+			
+				8563DE51A15BAA8540E3B833,
+			
+				40D05213F2DB386C8723C400,
+			
+				674B79023F82D9F60AC8DC10,
+			
+				E1E0898FF70E65EFEC6088BF,
+			
+				FE75622F6BA189C00350339F,
+			
+				5CF3F8F09602C29136FB88EA,
+			
+				AA289884C731D78451E86F9B,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

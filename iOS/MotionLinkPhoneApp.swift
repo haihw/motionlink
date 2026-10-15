@@ -96,6 +96,11 @@ struct PhoneView: View {
                 .font(.system(size: 64)).foregroundStyle(MotionTheme.accent)
                 .padding(.vertical, 10)
             Text(session.isStreaming ? "Move, tilt, and rotate" : "Motion paused").font(.title3.bold())
+            Toggle("Controller haptics", isOn: Binding(get: { session.hapticsEnabled }, set: { session.setHapticsEnabled($0) }))
+                .disabled(!session.supportsHaptics)
+            if !session.supportsHaptics {
+                Text("Haptic hardware is unavailable on this device.").font(.caption).foregroundStyle(.secondary)
+            }
             Button(session.isStreaming ? "Pause streaming" : "Resume streaming") { session.toggleStreaming() }
                 .buttonStyle(.borderedProminent).tint(MotionTheme.accent).foregroundStyle(.black)
                 .disabled(!session.hasMotion)
