@@ -22,29 +22,33 @@ struct MacView: View {
     @State private var mode = Mode.sword
     @State private var drawing = DrawingDemoState()
     @State private var maze = LaserMazeState()
+    @State private var flight = PaperFlightState()
     enum Mode: String, CaseIterable, Identifiable {
-        case studio = "Motion Studio", sword = "Sword Demo", wok = "Wok Demo", drawing = "Drawing Demo", maze = "Maze Demo"
+        case studio = "Motion Studio", sword = "Sword Demo", wok = "Wok Demo", drawing = "Drawing Demo", maze = "Maze Demo", flight = "Paper Plane"
         var id: Self { self }
     }
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Image(systemName: "gyroscope").font(.title2).foregroundStyle(MotionTheme.accent)
-                Text("MotionLink").font(.title2.bold())
+            VStack(spacing: 16) {
+                HStack {
+                    Image(systemName: "gyroscope").font(.title2).foregroundStyle(MotionTheme.accent)
+                    Text("MotionLink").font(.title2.bold())
+                    Spacer()
+                    StatusPill(text: session.isDemo ? "Demo motion" : session.status,
+                               active: session.deviceName != nil && !session.isPaused && !session.isStale)
+                }
                 Picker("View", selection: $mode) {
                     ForEach(Mode.allCases) { Text($0.rawValue).tag($0) }
-                }.pickerStyle(.segmented).labelsHidden().frame(width: 600).padding(.leading, 16)
-                Spacer()
-                StatusPill(text: session.isDemo ? "Demo motion" : session.status,
-                           active: session.deviceName != nil && !session.isPaused && !session.isStale)
+                }.pickerStyle(.segmented).labelsHidden()
             }
-            .padding(.horizontal, 28).padding(.top, 32).padding(.bottom, 22)
+            .padding(.horizontal, 28).padding(.top, 32).padding(.bottom, 18)
             Divider().overlay(.white.opacity(0.04))
             if mode == .studio { studio }
             else if mode == .sword { SwordDemoView(session: session) }
             else if mode == .wok { WokDemoView(session: session) }
             else if mode == .drawing { DrawingDemoView(session: session, drawing: drawing) }
-            else { LaserMazeView(session: session, maze: maze) }
+            else if mode == .maze { LaserMazeView(session: session, maze: maze) }
+            else { PaperFlightView(session: session, flight: flight) }
         }.background(MotionTheme.background)
             .onChange(of: mode) { _, mode in
                 if mode != .studio && session.isDemo { session.toggleDemo() }

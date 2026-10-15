@@ -5,6 +5,14 @@
 	};
 	objectVersion = 56;
 	objects = {
+		C45878EA61480EEE3D27CE50 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/PaperFlightGameplay.swift"; sourceTree = SOURCE_ROOT; };
+		0E3F422256EE283D5795961F = {isa = PBXBuildFile; fileRef = C45878EA61480EEE3D27CE50; };
+		134CF1E0FD76BFCC1BC66F77 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "macOS/PaperFlightArenaView.swift"; sourceTree = SOURCE_ROOT; };
+		3E3CE48E05760B6B82708EE8 = {isa = PBXBuildFile; fileRef = 134CF1E0FD76BFCC1BC66F77; };
+		FE9789BD8A88B67D74449BDE = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "macOS/PaperFlightView.swift"; sourceTree = SOURCE_ROOT; };
+		72515A2E7F7DBA9EE2488D56 = {isa = PBXBuildFile; fileRef = FE9789BD8A88B67D74449BDE; };
+		673B751EBC5364064E16C137 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/PaperFlightGameplay.swift"; sourceTree = SOURCE_ROOT; };
+		C86BC775D405D1E1875346D6 = {isa = PBXBuildFile; fileRef = 673B751EBC5364064E16C137; };
 		5639D5B91C18235DFE0D4878 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/MazeLeaderboard.swift"; sourceTree = SOURCE_ROOT; };
 		AA289884C731D78451E86F9B = {isa = PBXBuildFile; fileRef = 5639D5B91C18235DFE0D4878; };
 		107220AEF11607A169FC22EC = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/MazeLeaderboard.swift"; sourceTree = SOURCE_ROOT; };
@@ -138,6 +146,12 @@
 				9394ABCB6F05B2005D3C2357,
 			
 				107220AEF11607A169FC22EC,
+			
+				673B751EBC5364064E16C137,
+			
+				FE9789BD8A88B67D74449BDE,
+			
+				134CF1E0FD76BFCC1BC66F77,
 			);
 			name = MotionLinkMac;
 			sourceTree = "<group>";
@@ -168,6 +182,8 @@
 				F738D4948E3EB039EB80798C,
 			
 				5639D5B91C18235DFE0D4878,
+			
+				C45878EA61480EEE3D27CE50,
 			);
 			name = MotionLinkPhone;
 			sourceTree = "<group>";
@@ -307,6 +323,12 @@
 				51478E05F9D68BCA8805EFF1,
 			
 				F4C20611673CCEB9454E9086,
+			
+				C86BC775D405D1E1875346D6,
+			
+				72515A2E7F7DBA9EE2488D56,
+			
+				3E3CE48E05760B6B82708EE8,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -337,6 +359,8 @@
 				5CF3F8F09602C29136FB88EA,
 			
 				AA289884C731D78451E86F9B,
+			
+				0E3F422256EE283D5795961F,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
